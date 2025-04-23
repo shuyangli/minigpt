@@ -1,3 +1,5 @@
+import torch
+import numpy as np
 import dataclasses
 
 @dataclasses.dataclass
@@ -8,10 +10,13 @@ class Hyperparams:
    n_head: int
    n_layer: int
 
+def _tf_to_torch_tensor(tf_tensor: np.ndarray) -> torch.Tensor:
+    return torch.from_numpy(tf_tensor)
+
 class LinearParams:
     def __init__(self):
-        self.weights = None
-        self.biases = None
+        self.weights: "torch.Tensor | None" = None
+        self.biases: "torch.Tensor | None" = None
 
     def update_weights(self, name, value):
         if name[0] == "w" or name[0] == "g":
@@ -23,12 +28,12 @@ class LinearParams:
 
 class AttentionParams:
     def __init__(self):
-        self.cross_attention = LinearParams()
+        self.c_attn = LinearParams()
         self.out_projection = LinearParams()
 
     def update_weights(self, name, value):
         if name[0] == "c_attn":
-            self.cross_attention.update_weights(name[1:], value)
+            self.c_attn.update_weights(name[1:], value)
         elif name[0] == "c_proj":
             self.out_projection.update_weights(name[1:], value)
         else:
@@ -68,20 +73,23 @@ class TransformerBlockParams:
 
 class ModelParams:
     def __init__(self, num_layers: int):
-        self.positional_embeddings = None
-        self.token_embeddings = None
+        self.positional_embeddings: "torch.Tensor | None" = None
+        self.token_embeddings: "torch.Tensor | None" = None
         self.transformers = [TransformerBlockParams() for i in range(num_layers)]
         self.linear = LinearParams()
 
     def update_weights(self, name, value):
+        torch_value = _tf_to_torch_tensor(value)
+        del value
+
         if name[0] == "ln_f":
-            self.linear.update_weights(name[1:], value)
+            self.linear.update_weights(name[1:], torch_value)
         elif name[0] == "wpe":
-            self.positional_embeddings = value
+            self.positional_embeddings = torch_value
         elif name[0] == "wte":
-            self.token_embeddings = value
+            self.token_embeddings = torch_value
         elif name[0][0] == "h":
             layer = int(name[0][1:])
-            self.transformers[layer].update_weights(name[1:], value)
+            self.transformers[layer].update_weights(name[1:], torch_value)
         else:
-            raise ValueError(f"Model received unexpected name {name} of shape {value.shape}")
+            raise ValueError(f"Model received unexpected name {name} of shape {torch_value.shape}")
