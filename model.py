@@ -29,8 +29,8 @@ class GPT2(torch.nn.Module):
             self.position_embedding.weight = torch.nn.Parameter(model_params.positional_embeddings)
             for decoder, weights in zip(self.transformer, model_params.transformers):
                 decoder.load_weights(weights)
-            self.layernorm.weight = torch.nn.Parameter(model_params.linear.weights)
-            self.layernorm.bias = torch.nn.Parameter(model_params.linear.biases)
+            self.layernorm.weight = torch.nn.Parameter(model_params.ln_f.gamma)
+            self.layernorm.bias = torch.nn.Parameter(model_params.ln_f.beta)
             self.lm_head.weight = torch.nn.Parameter(model_params.token_embeddings)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:

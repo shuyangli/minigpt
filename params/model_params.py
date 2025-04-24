@@ -13,13 +13,26 @@ class Hyperparams:
 def _tf_to_torch_tensor(tf_tensor: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(tf_tensor)
 
+class LayerNormParams:
+    def __init__(self):
+        self.gamma: "torch.Tensor | None" = None
+        self.beta: "torch.Tensor | None" = None
+
+    def update_weights(self, name, value):
+        if name[0] == "g":
+            self.gamma = value
+        elif name[0] == "b":
+            self.beta = value
+        else:
+            raise ValueError(f"LayerNormParams received unexpected name {name} of shape {value.shape}")
+
 class LinearParams:
     def __init__(self):
         self.weights: "torch.Tensor | None" = None
         self.biases: "torch.Tensor | None" = None
 
     def update_weights(self, name, value):
-        if name[0] == "w" or name[0] == "g":
+        if name[0] == "w":
             self.weights = value
         elif name[0] == "b":
             self.biases = value
@@ -55,17 +68,17 @@ class FeedForwardParams:
 class TransformerBlockParams:
     def __init__(self):
         self.attention = AttentionParams()
-        self.linear_1 = LinearParams()
+        self.ln_1 = LayerNormParams()
         self.feed_foward = FeedForwardParams()
-        self.linear_2 = LinearParams()
+        self.ln_2 = LayerNormParams()
 
     def update_weights(self, name, value):
         if name[0] == "attn":
             self.attention.update_weights(name[1:], value)
         elif name[0] == "ln_1":
-            self.linear_1.update_weights(name[1:], value)
+            self.ln_1.update_weights(name[1:], value)
         elif name[0] == "ln_2":
-            self.linear_2.update_weights(name[1:], value)
+            self.ln_2.update_weights(name[1:], value)
         elif name[0] == "mlp":
             self.feed_foward.update_weights(name[1:], value)
         else:
@@ -76,14 +89,14 @@ class ModelParams:
         self.positional_embeddings: "torch.Tensor | None" = None
         self.token_embeddings: "torch.Tensor | None" = None
         self.transformers = [TransformerBlockParams() for i in range(num_layers)]
-        self.linear = LinearParams()
+        self.ln_f = LayerNormParams()
 
     def update_weights(self, name, value):
         torch_value = _tf_to_torch_tensor(value)
         del value
 
         if name[0] == "ln_f":
-            self.linear.update_weights(name[1:], torch_value)
+            self.ln_f.update_weights(name[1:], torch_value)
         elif name[0] == "wpe":
             self.positional_embeddings = torch_value
         elif name[0] == "wte":

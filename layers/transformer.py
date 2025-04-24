@@ -15,10 +15,10 @@ class GPT2TransformerDecoder(torch.nn.Module):
     def load_weights(self, model_params: TransformerBlockParams):
         with torch.no_grad():
             self.model_params = model_params
-            self.layernorm_1.weight = torch.nn.Parameter(model_params.linear_1.weights)
-            self.layernorm_1.bias = torch.nn.Parameter(model_params.linear_1.biases)
-            self.layernorm_2.weight = torch.nn.Parameter(model_params.linear_2.weights)
-            self.layernorm_2.bias = torch.nn.Parameter(model_params.linear_2.biases)
+            self.layernorm_1.weight = torch.nn.Parameter(model_params.ln_1.gamma)
+            self.layernorm_1.bias = torch.nn.Parameter(model_params.ln_1.beta)
+            self.layernorm_2.weight = torch.nn.Parameter(model_params.ln_2.gamma)
+            self.layernorm_2.bias = torch.nn.Parameter(model_params.ln_2.beta)
 
             self.mlp.load_weights(model_params.feed_foward)
             self.attn.load_weights(model_params.attention)
