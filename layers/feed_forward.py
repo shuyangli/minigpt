@@ -14,9 +14,9 @@ class GPT2FeedForwardNetwork(torch.nn.Module):
 
     def load_weights(self, model_params: FeedForwardParams):
         with torch.no_grad():
-            self.c_fc.weight = torch.nn.Parameter(model_params.up_projection.weights)
+            self.c_fc.weight = torch.nn.Parameter(model_params.up_projection.weights.squeeze(0).T)
             self.c_fc.bias = torch.nn.Parameter(model_params.up_projection.biases)
-            self.c_proj.weight = torch.nn.Parameter(model_params.down_projection.weights)
+            self.c_proj.weight = torch.nn.Parameter(model_params.down_projection.weights.squeeze(0).T)
             self.c_proj.bias = torch.nn.Parameter(model_params.down_projection.biases)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:

@@ -19,29 +19,37 @@ class GPT2(torch.nn.Module):
             transformer.GPT2TransformerDecoder(model_dim=embedding_dim,
                                                num_heads=n_head,
                                                feedforward_dim=3072) for _ in range(n_layer)])
-
-        self.ln_f = torch.nn.Linear(in_features=embedding_dim, out_features=embedding_dim)
-        self.softmax = torch.nn.Softmax(dim=1)  # Each output is now [N, n_vocab] and we will argmax for the next vocab.
+        # Each output is now [N, n_vocab] and we will argmax for the next vocab.
+        self.layernorm = torch.nn.LayerNorm(embedding_dim)
+        self.lm_head = torch.nn.Linear(embedding_dim, vocab_size, bias=False)
 
     def load_weights(self, model_params: ModelParams):
         with torch.no_grad():
             self.vocab_embedding.weight = torch.nn.Parameter(model_params.token_embeddings)
             self.position_embedding.weight = torch.nn.Parameter(model_params.positional_embeddings)
-            self.ln_f.weight = torch.nn.Parameter(model_params.linear.weights)
-            self.ln_f.bias = torch.nn.Parameter(model_params.linear.biases)
             for decoder, weights in zip(self.transformer, model_params.transformers):
                 decoder.load_weights(weights)
+            self.layernorm.weight = torch.nn.Parameter(model_params.linear.weights)
+            self.layernorm.bias = torch.nn.Parameter(model_params.linear.biases)
+            self.lm_head.weight = torch.nn.Parameter(model_params.token_embeddings)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        print(f"{input.shape=}")
+        batch_size, seq_length = input.shape
 
         token_embeddings = self.vocab_embedding(input)  # [N, n_dims]
-        position_embeddings = torch.arange(start=0, end=input.shape[0]) # [N, n_dims]
-        position_embeddings = self.position_embedding(position_embeddings)
+
+        position_ids = torch.arange(0, seq_length, dtype=torch.long, device=input.device)
+        position_ids = position_ids.unsqueeze(0).expand_as(input)  # [batch_size, seq_length]
+        position_embeddings = self.position_embedding(position_ids)
 
         x = token_embeddings + position_embeddings      # [N, n_dims]
+
         for transformer_block in self.transformer:
             x = transformer_block(x)
-        x = self.ln_f(x)
-        x = self.softmax(x)
-        return x
+
+        x = self.layernorm(x)
+
+        # Unembed
+        last_token = x[:, -1, :]
+        logits = self.lm_head(last_token)
+        return logits
